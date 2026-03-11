@@ -1,10 +1,11 @@
-import { signUp,signIn, refreshToken } from "../controllers/auth.controller.js"
-import {Router} from "express"
-const authRouter = Router()
+import { Router } from "express";
+import { signUp, signIn, refreshToken, logout } from "../controllers/auth.controller.js";
 
-authRouter.post('/sign-up',signUp);
-authRouter.post("/sign-in",signIn)
-authRouter.post("/refresh-token",refreshToken)
+const authRouter = Router();
 
+authRouter.post("/sign-up", signUp);
+authRouter.post("/sign-in", signIn);
+authRouter.post("/refresh-token", refreshToken);
+authRouter.post("/logout", logout); // ✅ Logout endpoint
 
 export default authRouter;

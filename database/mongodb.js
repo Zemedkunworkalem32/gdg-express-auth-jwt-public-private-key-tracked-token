@@ -1,13 +1,18 @@
-import mongoose, { mongo } from "mongoose"
-import { DB_URI } from "../config/env.js"
+import mongoose from "mongoose";
+import { DB_URI } from "../config/env.js";
 
-const connectToDatabase = async()=>{
-    try{
-        await mongoose.connect(DB_URI);
-        console.log("Database connected successfully")
-    }catch(err){
-        console.log(`Not connected to the databse ${err}`)
-    }
-}
+const connectToDatabase = async () => {
+  if (!DB_URI) {
+    console.error("❌ DB_URI is missing. Please set it in .env");
+    return;
+  }
 
-export default connectToDatabase
+  try {
+    await mongoose.connect(DB_URI);
+    console.log("✅ Database connected successfully");
+  } catch (err) {
+    console.error(`❌ Not connected to the database: ${err.message}`);
+  }
+};
+
+export default connectToDatabase;

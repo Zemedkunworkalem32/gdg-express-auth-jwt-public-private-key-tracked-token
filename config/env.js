@@ -1,10 +1,8 @@
-import { config } from 'dotenv';
-config({ path: `.env.${process.env.NODE_ENV || 'development'}.local` });
-
+import { config } from "dotenv";
+config(); // loads .env automatically
 
 export const {
   PORT,
-  NODE_ENV,
   DB_URI,
   ACCESS_TOKEN_EXPIRE_DATE,
   REFRESH_TOKEN_EXPIRE_DATE,
@@ -12,10 +10,7 @@ export const {
   ACCESS_TOKEN_PRIVATE_KEY,
   REFRESH_TOKEN_PUBLIC_KEY,
   REFRESH_TOKEN_PRIVATE_KEY,
-} = {
-  ...process.env,
-  ACCESS_TOKEN_PUBLIC_KEY: process.env.ACCESS_TOKEN_PUBLIC_KEY?.replace(/\\n/g, '\n'),
-  ACCESS_TOKEN_PRIVATE_KEY: process.env.ACCESS_TOKEN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  REFRESH_TOKEN_PUBLIC_KEY: process.env.REFRESH_TOKEN_PUBLIC_KEY?.replace(/\\n/g, '\n'),
-  REFRESH_TOKEN_PRIVATE_KEY: process.env.REFRESH_TOKEN_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-};
+} = { ...process.env };
+
+console.log("MongoDB URI:", DB_URI ? DB_URI : "❌ DB_URI is missing");
+console.log("Server PORT:", PORT ? PORT : 5500);
