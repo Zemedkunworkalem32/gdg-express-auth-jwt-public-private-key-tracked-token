@@ -1,3 +1,4 @@
+// auth.controller.js
 import User from "../models/user.model.js";
 import RefreshToken from "../models/refresh_token.model.js";
 import bcrypt from "bcrypt";
@@ -8,32 +9,49 @@ import {
   ACCESS_TOKEN_PRIVATE_KEY,
   REFRESH_TOKEN_EXPIRE_DATE,
   REFRESH_TOKEN_PRIVATE_KEY,
-  REFRESH_TOKEN_PUBLIC_KEY,
 } from "../config/env.js";
 
 // --- SIGN UP ---
 export const signUp = async (req, res, next) => {
   try {
     const { full_name, email, password } = req.body;
-    if (!full_name || !email || !password) throw { statusCode: 400, message: "full_name,email,password required" };
-    if (await User.findOne({ email })) throw { statusCode: 409, message: "User already exists" };
-    if (password.length < 8) throw { statusCode: 409, message: "Password too short" };
+    if (!full_name || !email || !password) {
+      throw { statusCode: 400, message: "full_name,email,password required" };
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      throw { statusCode: 409, message: "User already exists" };
+    }
+
+    if (password.length < 8) {
+      throw { statusCode: 409, message: "Password too short" };
+    }
 
     const hashed_password = await bcrypt.hash(password, 10);
     const newUser = await User.create({ full_name, email, password: hashed_password });
 
-    const access_token = jwt.sign({ user_id: newUser._id }, ACCESS_TOKEN_PRIVATE_KEY, { algorithm: "RS256", expiresIn: ACCESS_TOKEN_EXPIRE_DATE });
-    const refresh_token = jwt.sign({ user_id: newUser._id }, REFRESH_TOKEN_PRIVATE_KEY, { algorithm: "RS256", expiresIn: REFRESH_TOKEN_EXPIRE_DATE });
+    // Generate JWT tokens (HS256)
+    const access_token = jwt.sign({ user_id: newUser._id }, ACCESS_TOKEN_PRIVATE_KEY, {
+      algorithm: "HS256",
+      expiresIn: ACCESS_TOKEN_EXPIRE_DATE,
+    });
+    const refresh_token = jwt.sign({ user_id: newUser._id }, REFRESH_TOKEN_PRIVATE_KEY, {
+      algorithm: "HS256",
+      expiresIn: REFRESH_TOKEN_EXPIRE_DATE,
+    });
 
+    // Set cookies
     res.cookie("access_token", access_token, { maxAge: 1000 * 60 * 15, httpOnly: true, sameSite: "lax" });
     res.cookie("refresh_token", refresh_token, { maxAge: 1000 * 60 * 60 * 24 * 7, httpOnly: true, sameSite: "lax" });
 
+    // Hash refresh token and store in DB
     const hashed_refresh_token = crypto.createHash("sha256").update(refresh_token).digest("hex");
     const expires_at = new Date();
-    expires_at.setDate(expires_at.getDate() + 90);
-
+    expires_at.setDate(expires_at.getDate() + 90); // optional DB expiry
     await RefreshToken.create({ user_id: newUser._id, refresh_token: hashed_refresh_token, expires_at });
 
+    // Remove password from response
     const userObj = newUser.toObject();
     delete userObj.password;
 
@@ -47,24 +65,38 @@ export const signUp = async (req, res, next) => {
 export const signIn = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) throw { statusCode: 400, message: "email,password required" };
+    if (!email || !password) {
+      throw { statusCode: 400, message: "email,password required" };
+    }
 
     const user = await User.findOne({ email });
-    if (!user) throw { statusCode: 404, message: "User not found" };
+    if (!user) {
+      throw { statusCode: 404, message: "User not found" };
+    }
 
     const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) throw { statusCode: 401, message: "Invalid credentials" };
+    if (!validPassword) {
+      throw { statusCode: 401, message: "Invalid credentials" };
+    }
 
-    const access_token = jwt.sign({ user_id: user._id }, ACCESS_TOKEN_PRIVATE_KEY, { algorithm: "RS256", expiresIn: ACCESS_TOKEN_EXPIRE_DATE });
-    const refresh_token = jwt.sign({ user_id: user._id }, REFRESH_TOKEN_PRIVATE_KEY, { algorithm: "RS256", expiresIn: REFRESH_TOKEN_EXPIRE_DATE });
+    // Generate JWT tokens (HS256)
+    const access_token = jwt.sign({ user_id: user._id }, ACCESS_TOKEN_PRIVATE_KEY, {
+      algorithm: "HS256",
+      expiresIn: ACCESS_TOKEN_EXPIRE_DATE,
+    });
+    const refresh_token = jwt.sign({ user_id: user._id }, REFRESH_TOKEN_PRIVATE_KEY, {
+      algorithm: "HS256",
+      expiresIn: REFRESH_TOKEN_EXPIRE_DATE,
+    });
 
+    // Set cookies
     res.cookie("access_token", access_token, { maxAge: 1000 * 60 * 15, httpOnly: true, sameSite: "lax" });
     res.cookie("refresh_token", refresh_token, { maxAge: 1000 * 60 * 60 * 24 * 7, httpOnly: true, sameSite: "lax" });
 
+    // Hash refresh token and store in DB
     const hashed_refresh_token = crypto.createHash("sha256").update(refresh_token).digest("hex");
     const expires_at = new Date();
     expires_at.setDate(expires_at.getDate() + 90);
-
     await RefreshToken.create({ user_id: user._id, refresh_token: hashed_refresh_token, expires_at });
 
     const userObj = user.toObject();
@@ -104,8 +136,13 @@ export const refreshToken = async (req, res, next) => {
     const db_refresh_token = await RefreshToken.findOne({ refresh_token: hashed_refresh_token });
     if (!db_refresh_token) throw { statusCode: 401, message: "Unauthorized" };
 
-    const decoded = jwt.verify(refresh_token, REFRESH_TOKEN_PUBLIC_KEY);
-    const access_token = jwt.sign({ user_id: decoded.user_id }, ACCESS_TOKEN_PRIVATE_KEY, { algorithm: "RS256", expiresIn: ACCESS_TOKEN_EXPIRE_DATE });
+    // Verify token using HS256 secret
+    const decoded = jwt.verify(refresh_token, REFRESH_TOKEN_PRIVATE_KEY, { algorithms: ["HS256"] });
+
+    const access_token = jwt.sign({ user_id: decoded.user_id }, ACCESS_TOKEN_PRIVATE_KEY, {
+      algorithm: "HS256",
+      expiresIn: ACCESS_TOKEN_EXPIRE_DATE,
+    });
 
     res.cookie("access_token", access_token, { maxAge: 1000 * 60 * 15, httpOnly: true, sameSite: "lax" });
     res.status(201).json({ success: true, data: { access_token } });
